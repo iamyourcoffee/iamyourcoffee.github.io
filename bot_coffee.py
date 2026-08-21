@@ -1,95 +1,97 @@
 import os
+import requests
+import json
 import random
 from datetime import datetime
 import google.generativeai as genai
 
-# 🚨 비밀금고 접근 권한
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-def load_keywords(filename="keywords.txt"):
+RECIPE_SEEDS = [
+    "홈카페 바닐라라떼 만들기", "아인슈페너 크림 비율", "스타벅스 돌체라떼 레시피",
+    "홈카페 카라멜 마끼아또", "콜드브루 라떼 레시피", "카페모카 홈카페",
+    "흑임자 크림 라떼 만들기", "아포가토 레시피", "얼그레이 샷추가 레시피",
+    "연유라떼 홈카페 비율"
+]
+
+def get_longtail_keyword(base_keyword):
+    print(f"🔍 구글 검색창에서 '{base_keyword}' 연관 레시피 롱테일 크롤링 중...")
     try:
-        with open(filename, "r", encoding="utf-8") as f:
-            keywords = [line.strip() for line in f.readlines() if line.strip()]
-        return keywords
-    except FileNotFoundError:
-        print(f"🚨 에러: {filename} 파일이 없습니다!")
-        exit(1)
+        url = f"http://suggestqueries.google.com/complete/search?client=chrome&q={base_keyword}"
+        response = requests.get(url)
+        suggestions = json.loads(response.text)[1]
+        
+        banned_words = ["디카페인", "원두", "구독", "납품", "도매"]
+        filtered = [s for s in suggestions if not any(b in s for b in banned_words)]
+        
+        return filtered[-1] if filtered else base_keyword
+    except:
+        return base_keyword
 
 def generate_dynamic_toc(model, keyword):
-    # 🧠 [Step 1] AI에게 키워드 맞춤형 목차를 짜오라고 지시!
-    print(f"🔍 '{keyword}' 맞춤형 목차 기획 중...")
     prompt = f"""
-    너는 스페셜티 커피 전문 마케터야.
-    사람들이 구글에 '{keyword}'를 검색하는 진짜 의도를 파악해서,
-    가장 클릭하고 싶고 유용한 블로그 목차 3개를 작성해.
+    너는 홈카페 레시피 전문 크리에이터야.
+    '{keyword}'를 검색한 사람들이 집에서 똑같이 따라 만들 수 있도록 완벽한 레시피 목차 3개를 기획해.
     
     [🚨 규칙]
-    - 반드시 1. 2. 3. 번호로 시작할 것.
-    - 다른 군더더기 인사말 없이 딱 목차 3줄만 출력할 것.
-    - 디카페인 관련 내용은 절대 포함하지 말 것.
+    - 1. 필요한 재료 소개 2. 황금 비율 레시피 과정 3. 맛있게 즐기는 꿀팁 (이 흐름으로 작성)
+    - 반드시 1. 2. 3. 번호로 시작하고, 딱 목차 3줄만 출력할 것.
+    - 로스팅, 원두의 맛, 산미, 숙성, 가스 배출 같은 전문가적인 원두 이야기는 절대 금지.
     """
-    toc = model.generate_content(prompt).text.strip()
-    return toc
+    return model.generate_content(prompt).text.strip()
 
 def write_blog_post(model, keyword, dynamic_toc):
-    # ✍️ [Step 2] AI가 스스로 짠 목차를 바탕으로 본문 작성!
-    print(f"✍️ 기획된 목차를 바탕으로 블로그 본문 작성 중...")
     prompt = f"""
-    너는 스페셜티 커피 브랜드 '아임유어커피'의 수석 로스터야.
+    너는 누구나 따라 하기 쉬운 홈카페 음료 레시피를 전하는 블로거야.
     주제: '{keyword}'
     
     [🚨 엄격한 작성 규칙]
-    1. 반드시 아래의 [맞춤형 목차] 흐름에 따라 글을 작성해.
+    1. 아래 [맞춤형 레시피 목차]에 따라 재료, 용량(ml, g), 만드는 순서 위주로 작성해.
     2. 특수문자 숫자 이모지(1️⃣, 2️⃣) 절대 금지! 일반 텍스트(1., 2.)만 써.
-    3. 디카페인 커피에 대한 언급은 절대 금지!
-    4. 타사 브랜드 비하 금지, 객관적이고 고급스러운 정보 전달.
+    3. 원두 판매, 정기 구독, 로스팅 날짜, 200g 소포장 같은 비즈니스 및 원두 관련 이야기는 철저하게 배제해. 오직 '음료를 맛있게 만드는 법'에만 집중해!
     
-    [맞춤형 목차]
+    [맞춤형 레시피 목차]
     {dynamic_toc}
     """
     return model.generate_content(prompt).text
 
 def save_post(keyword, content):
     today = datetime.now().strftime("%Y-%m-%d")
-    # 파일명에 공백이 들어갈 수 있으니 안전하게 변환
     safe_keyword = keyword.replace(" ", "-")
     filename = f"{today}-{safe_keyword}.md"
     
-    top_image = "![아임유어커피](https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80)\n\n"
+    top_image = "![홈카페 레시피](https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80)\n\n"
     
+    # 🚨 사령관님 하명대로 시크하게 딱 한 줄 + 링크!
     cta_link = f"""\n\n---
-### ☕ 나만의 공간을 완벽한 카페로
-오늘 알게 된 커피 꿀팁, 최고급 스페셜티 원두로 직접 경험해 보세요.
-당신의 취향을 완벽하게 저격할 한 잔, **'아임유어커피'**가 곧 찾아옵니다.
+-당신이 찾던 원두, 아임유어커피-
+**[👉 https://smartstore.naver.com/iamyourcoffee](https://smartstore.naver.com/iamyourcoffee)**
 """
     final_content = top_image + content + cta_link
-    front_matter = f"---\nlayout: post\ntitle: '{keyword} - 수석 로스터가 알려주는 완벽 가이드'\ndate: {today}\n---\n\n"
+    front_matter = f"---\nlayout: post\ntitle: '{keyword} - 집에서 즐기는 완벽한 홈카페 레시피'\ndate: {today}\n---\n\n"
     
     os.makedirs("_posts", exist_ok=True)
-    with open(f"_posts/{filename}", "w", encoding="utf-8") as f:
+    filepath = f"_posts/{filename}"
+    with open(filepath, "w", encoding="utf-8") as f:
         f.write(front_matter + final_content)
-    print(f"🚀 [성공] '{keyword}' 맞춤형 포스팅 완료!")
+    print(f"🚀 [성공] 레시피 파일 생성 완료: {filepath}")
+    return filepath
 
 if __name__ == "__main__":
-    if not GEMINI_API_KEY:
-        print("🚨 에러: API 키가 없습니다!")
-        exit(1)
-        
     model = genai.GenerativeModel('gemini-3.5-flash')
     
-    # 1. 280개 키워드 리스트 로드
-    keyword_list = load_keywords()
+    target_keyword = random.choice(RECIPE_SEEDS)
+    print(f"🤖 타겟 레시피 시드: {target_keyword}")
     
-    # 2. 오늘의 타겟 키워드 랜덤 선택
-    target_keyword = random.choice(keyword_list)
-    print(f"🤖 오늘 아임유어커피 봇의 타겟: {target_keyword}")
+    longtail_keyword = get_longtail_keyword(target_keyword)
+    print(f"🎯 최종 롱테일 레시피 키워드: {longtail_keyword}")
     
-    # 3. 맞춤형 목차 생성 (투스텝 작전 1)
-    custom_toc = generate_dynamic_toc(model, target_keyword)
-    print(f"📋 [생성된 맞춤형 목차]\n{custom_toc}")
+    custom_toc = generate_dynamic_toc(model, longtail_keyword)
+    print(f"📋 [기획된 레시피 목차]\n{custom_toc}")
     
-    # 4. 본문 작성 및 저장 (투스텝 작전 2)
-    content = write_blog_post(model, target_keyword, custom_toc)
-    save_post(target_keyword, content)
-    print("✅ 투스텝 동적 뇌구조 포스팅 완료!")
+    content = write_blog_post(model, longtail_keyword, custom_toc)
+    filepath = save_post(longtail_keyword, content)
+    
+    with open("last_test_file.txt", "w") as f:
+        f.write(filepath)
