@@ -2,7 +2,7 @@ name: Coffee Auto Posting Bot
 
 on:
   schedule:
-    - cron: '0 16 * * *'
+    - cron: '0 23 * * *'  # 한국 시간 매일 아침 8시 가동!
   workflow_dispatch:
 
 permissions:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # 🚨 공주님 어명: 10분 넘게 농땡이 피우면 강제 사형!
     steps:
     - name: 🗂️ 저장소 코드 가져오기
       uses: actions/checkout@v4
@@ -23,14 +24,9 @@ jobs:
     - name: 📦 필요 라이브러리 설치
       run: |
         python -m pip install --upgrade pip
-        pip install google-generativeai
+        pip install google-generativeai requests bs4
 
-    - name: ⏰ 인간화 지연 (실전 모드)
-      run: |
-        echo "구글 알고리즘을 속이기 위해 랜덤 잠복 후 기상합니다..."
-        sleep $((RANDOM % 7200 + 60))
-
-    - name: 🤖 커피 1호기 가동
+    - name: 🤖 커피 1호기 즉시 가동 (대기 시간 없음!)
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: python3 bot_coffee.py
@@ -40,5 +36,6 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add .
-        git commit -m "🚀 [자동발행] 새벽에 커피 봇이 향긋한 포스팅을 완료했습니다!" || echo "No changes to commit"
+        git commit -m "🚀 [자동발행] 커피 봇 포스팅 완료" || echo "변경 사항 없음"
+        git pull --rebase || true
         git push
