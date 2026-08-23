@@ -3,7 +3,7 @@ layout: default
 ---
 
 <div style="text-align: center; padding: 50px 0;">
-  <h1>☕ I Am Your Coffee</h1>
+  <h1>☕ 아임유어커피</h1>
   <p>당신의 취향을 저격할 완벽한 커피 매거진, 곧 시작됩니다.</p>
 </div>
 
@@ -11,7 +11,6 @@ layout: default
 
 <h2>📚 최신 커피 레시피 목록</h2>
 <ul>
-  <!-- 여기서부터 지킬(Jekyll) 엔진이 _posts 폴더의 글을 반복해서 불러옵니다 -->
   {% for post in site.posts %}
     <li style="margin-bottom: 10px;">
       <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a> 
